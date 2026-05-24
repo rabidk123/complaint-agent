@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>University Complaint Portal</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background: #f0f2f5;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 2rem;
+    }
+
+    .container {
+      background: white;
+      border-radius: 12px;
+      padding: 2rem;
+      max-width: 600px;
+      width: 100%;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+    }
+
+    h1 {
+      font-size: 1.5rem;
+      font-weight: 600;
+      color: #1a1a2e;
+      margin-bottom: 0.3rem;
+    }
+
+    .subtitle {
+      color: #666;
+      font-size: 0.9rem;
+      margin-bottom: 1.8rem;
+    }
+
+    label {
+      display: block;
+      font-size: 0.85rem;
+      font-weight: 500;
+      color: #333;
+      margin-bottom: 0.4rem;
+    }
+
+    input, textarea {
+      width: 100%;
+      padding: 0.7rem 0.9rem;
+      border: 1.5px solid #ddd;
+      border-radius: 8px;
+      font-size: 0.95rem;
+      font-family: inherit;
+      margin-bottom: 1.2rem;
+      transition: border-color 0.2s;
+      outline: none;
+    }
+
+    input:focus, textarea:focus {
+      border-color: #4f46e5;
+    }
+
+    textarea { resize: vertical; min-height: 100px; }
+
+    button {
+      background: #4f46e5;
+      color: white;
+      border: none;
+      padding: 0.75rem 1.5rem;
+      border-radius: 8px;
+      font-size: 0.95rem;
+      font-weight: 500;
+      cursor: pointer;
+      width: 100%;
+      transition: background 0.2s;
+    }
+
+    button:hover { background: #4338ca; }
+    button:disabled { background: #a5b4fc; cursor: not-allowed; }
+
+    /* result card */
+    .result-card {
+      margin-top: 1.5rem;
+      border-radius: 10px;
+      padding: 1.2rem 1.4rem;
+      display: none;
+    }
+
+    .result-card.success { background: #f0fdf4; border: 1.5px solid #86efac; }
+    .result-card.emergency { background: #fff1f2; border: 1.5px solid #fca5a5; }
+    .result-card.clarify { background: #fffbeb; border: 1.5px solid #fcd34d; }
+
+    .ticket-id {
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: #1a1a2e;
+      margin-bottom: 0.8rem;
+    }
+
+    .ticket-row {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.88rem;
+      padding: 0.35rem 0;
+      border-bottom: 1px solid rgba(0,0,0,0.06);
+    }
+
+    .ticket-row:last-child { border-bottom: none; }
+    .ticket-label { color: #666; }
+    .ticket-value { font-weight: 500; color: #1a1a2e; text-align: right; max-width: 60%; }
+
+    .badge {
+      display: inline-block;
+      padding: 2px 10px;
+      border-radius: 99px;
+      font-size: 0.78rem;
+      font-weight: 600;
+    }
+
+    .badge-Critical { background: #fee2e2; color: #b91c1c; }
+    .badge-Normal   { background: #dbeafe; color: #1d4ed8; }
+    .badge-Low      { background: #f0fdf4; color: #15803d; }
+    .badge-EMERGENCY { background: #b91c1c; color: white; }
+
+    .clarify-question {
+      font-size: 0.95rem;
+      color: #92400e;
+      font-weight: 500;
+      margin-bottom: 1rem;
+    }
+
+    .spinner {
+      display: inline-block;
+      width: 16px; height: 16px;
+      border: 2px solid rgba(255,255,255,0.4);
+      border-top-color: white;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      vertical-align: middle;
+      margin-right: 6px;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🎓 Hostel Complaint Portal</h1>
+    <p class="subtitle">Submit your complaint — our system will route it to the right department automatically.</p>
+
+    <div id="form-section">
+      <label for="name">Your Name</label>
+      <input type="text" id="name" placeholder="e.g. Ali Hassan" />
+
+      <label for="complaint">Describe your complaint</label>
+      <textarea id="complaint" placeholder="e.g. WiFi in hostel block C has been down since yesterday evening..."></textarea>
+
+      <button id="submit-btn" onclick="submitComplaint()">Submit Complaint</button>
+    </div>
+
+    <!-- clarification follow-up (shown when agent needs more info) -->
+    <div id="clarify-section" style="display:none; margin-top:1.5rem;">
+      <div class="result-card clarify" style="display:block;">
+        <p class="clarify-question" id="clarify-question"></p>
+        <textarea id="clarify-answer" placeholder="Type your answer here..."></textarea>
+        <button onclick="submitClarified()">Submit Answer</button>
+      </div>
+    </div>
+
+    <!-- result ticket -->
+    <div class="result-card" id="result-card">
+      <div class="ticket-id" id="ticket-id"></div>
+      <div id="ticket-rows"></div>
+      <p style="margin-top:1rem; font-size:0.85rem; color:#666;" id="result-message"></p>
+    </div>
+  </div>
+
+  <script>
+    let originalComplaint = "";
+
+    async function submitComplaint() {
+      const name = document.getElementById("name").value.trim();
+      const complaint = document.getElementById("complaint").value.trim();
+
+      if (!complaint) {
+        alert("Please describe your complaint first.");
+        return;
+      }
+
+      originalComplaint = complaint;
+      setLoading(true);
+
+      try {
+        const res = await fetch("/submit", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name, complaint })
+        });
+
+        const data = await res.json();
+        handleResponse(data);
+      } catch (err) {
+        alert("Something went wrong. Please try again.");
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    async function submitClarified() {
+      const name = document.getElementById("name").value.trim();
+      const followup = document.getElementById("clarify-answer").value.trim();
+
+      if (!followup) { alert("Please answer the question."); return; }
+
+      setLoading(true);
+
+      try {
+        const res = await fetch("/submit-clarified", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name, original_complaint: originalComplaint, followup_answer: followup })
+        });
+
+        const data = await res.json();
+        document.getElementById("clarify-section").style.display = "none";
+        showTicket(data.ticket, data.message, false);
+      } catch (err) {
+        alert("Something went wrong.");
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    function handleResponse(data) {
+      if (data.needs_clarification) {
+        // agent wants more info before creating a ticket
+        document.getElementById("clarify-question").textContent = data.question;
+        document.getElementById("clarify-section").style.display = "block";
+        document.getElementById("clarify-section").scrollIntoView({ behavior: "smooth" });
+        return;
+      }
+
+      showTicket(data.ticket, data.message, data.is_emergency);
+    }
+
+    function showTicket(ticket, message, isEmergency) {
+      const card = document.getElementById("result-card");
+      card.className = "result-card " + (isEmergency ? "emergency" : "success");
+      card.style.display = "block";
+
+      document.getElementById("ticket-id").textContent = (isEmergency ? "🚨 " : "✅ ") + ticket.id;
+
+      const urgencyBadge = `<span class="badge badge-${ticket.urgency}">${ticket.urgency}</span>`;
+
+      document.getElementById("ticket-rows").innerHTML = `
+        <div class="ticket-row"><span class="ticket-label">Summary</span><span class="ticket-value">${ticket.summary}</span></div>
+        <div class="ticket-row"><span class="ticket-label">Category</span><span class="ticket-value">${ticket.category}</span></div>
+        <div class="ticket-row"><span class="ticket-label">Urgency</span><span class="ticket-value">${urgencyBadge}</span></div>
+        <div class="ticket-row"><span class="ticket-label">Assigned to</span><span class="ticket-value">${ticket.assigned_to}</span></div>
+        <div class="ticket-row"><span class="ticket-label">Expected resolution</span><span class="ticket-value">${ticket.eta}</span></div>
+        <div class="ticket-row"><span class="ticket-label">Submitted</span><span class="ticket-value">${ticket.timestamp}</span></div>
+      `;
+
+      document.getElementById("result-message").textContent = message;
+      card.scrollIntoView({ behavior: "smooth" });
+    }
+
+    function setLoading(on) {
+      const btn = document.getElementById("submit-btn");
+      btn.disabled = on;
+      btn.innerHTML = on
+        ? '<span class="spinner"></span>Analyzing complaint...'
+        : 'Submit Complaint';
+    }
+  </script>
+</body>
+</html>
